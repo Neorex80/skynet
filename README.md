@@ -150,6 +150,9 @@ npm run build
 - Data visualization
 - Offline capabilities
 - Multi-language support
+## Purpose 
+
+Project was creatod as major project for collge last year so ... ifyuk
 
 ## 📝 License
 
