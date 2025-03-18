@@ -1,6 +1,7 @@
 # Skynet AI Assistant
 
-![Skynet AI Assistant](https://images.unsplash.com/photo-1677442135132-d557834c0d72?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D)
+![image](https://github.com/user-attachments/assets/4b64a841-c051-4ff9-a9d9-d272b6ca9219)
+
 
 Skynet is a next-generation AI assistant platform that leverages advanced foundation models and reasoning-enhanced language models to provide users with intelligent, contextual, and helpful responses.
 
