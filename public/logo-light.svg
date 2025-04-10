@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100" fill="none">
+  <!-- Circuit board background pattern -->
+  <circle cx="50" cy="50" r="50" fill="none" />
+  
+  <!-- Swirl design inspired by the image - lighter colors for light mode -->
+  <g>
+    <!-- First curved segment -->
+    <path d="M33 35C37 25 53 19 65 30C77 41 68 61 55 65" stroke="#2563EB" stroke-width="3" fill="#EFF6FF"/>
+    <!-- Second curved segment -->
+    <path d="M65 65C55 69 40 64 32 50C24 36 37 23 49 20" stroke="#2563EB" stroke-width="3" fill="#EFF6FF"/>
+    <!-- Third curved segment -->
+    <path d="M49 80C40 76 25 69 21 55C17 41 30 30 43 30" stroke="#2563EB" stroke-width="3" fill="#EFF6FF"/>
+  </g>
+  
+  <!-- Circuit patterns on the swirls - darker for light mode -->
+  <!-- Circuit lines on first segment -->
+  <path d="M41 30L45 35M55 25L58 30M65 35L68 39" stroke="#0284C7" stroke-width="0.8" stroke-linecap="round"/>
+  <!-- Circuit lines on second segment -->
+  <path d="M30 50L35 53M25 60L30 62M40 75L45 73" stroke="#0284C7" stroke-width="0.8" stroke-linecap="round"/>
+  <!-- Circuit lines on third segment -->
+  <path d="M60 75L63 70M70 60L73 56M75 45L78 40" stroke="#0284C7" stroke-width="0.8" stroke-linecap="round"/>
+  
+  <!-- Central glowing core -->
+  <circle cx="50" cy="50" r="10" fill="#F8FAFC" stroke="#2563EB" stroke-width="2"/>
+  <circle cx="50" cy="50" r="6" fill="#3B82F6" opacity="0.7"/>
+  <circle cx="50" cy="50" r="3" fill="#FFFFFF" opacity="0.9"/>
+  
+  <!-- Circuit nodes -->
+  <circle cx="41" cy="30" r="1" fill="#0284C7"/>
+  <circle cx="55" cy="25" r="1" fill="#0284C7"/>
+  <circle cx="65" cy="35" r="1" fill="#0284C7"/>
+  <circle cx="30" cy="50" r="1" fill="#0284C7"/>
+  <circle cx="25" cy="60" r="1" fill="#0284C7"/>
+  <circle cx="40" cy="75" r="1" fill="#0284C7"/>
+  <circle cx="60" cy="75" r="1" fill="#0284C7"/>
+  <circle cx="70" cy="60" r="1" fill="#0284C7"/>
+  <circle cx="75" cy="45" r="1" fill="#0284C7"/>
+</svg>
