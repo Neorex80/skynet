@@ -66,12 +66,6 @@ export function ModelSelector({ currentModel, onModelChange, isDarkMode }: Model
       category: 'Reasoning'
     },
     {
-      id: 'deepseek-r1-distill-qwen-32b',
-      name: 'DeepSeek R1 (Qwen 32B)',
-      description: 'Reasoning with knowledge',
-      category: 'Reasoning'
-    },
-    {
       id: 'deepseek-r1-distill-llama-70b',
       name: 'DeepSeek R1 (Llama 70B)',
       description: 'High-capacity reasoning',
