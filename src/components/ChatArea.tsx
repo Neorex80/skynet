@@ -32,116 +32,126 @@ export function ChatArea({
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
   const [isAtBottom, setIsAtBottom] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const prevMessagesLengthRef = useRef<number>(0);
+  const prevScrollHeightRef = useRef<number>(0);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Debounced scroll check function to avoid performance issues
+  const debouncedCheckScroll = () => {
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+    scrollTimeoutRef.current = setTimeout(() => {
+      checkScrollPosition();
+    }, 100);
+  };
 
   // Check if we need to show the scroll to bottom button
   const checkScrollPosition = () => {
     if (!containerRef.current) return;
     
     const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-    // Show button when user scrolls up more than 200px from bottom
-    const atBottom = scrollHeight - scrollTop - clientHeight < 200;
+    // Define "at bottom" as being within 100px of the bottom
+    const threshold = 100;
+    const atBottom = scrollHeight - scrollTop - clientHeight < threshold;
     
     setIsAtBottom(atBottom);
     setShowScrollButton(!atBottom);
     
-    // Auto-scroll only if we're already near the bottom or if it's explicitly enabled
-    if (atBottom && autoScroll) {
-      scrollToBottom(false);
+    // Only maintain autoScroll if we're at the bottom
+    if (!atBottom && autoScroll) {
+      setAutoScroll(false);
     }
   };
 
   // Smooth scroll to bottom function
-  const scrollToBottom = (forceSmooth = true) => {
-    if (containerRef.current) {
-      containerRef.current.scrollTo({
-        top: containerRef.current.scrollHeight,
-        behavior: forceSmooth ? 'smooth' : 'auto'
+  const scrollToBottom = (smooth = true) => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({
+        behavior: smooth ? 'smooth' : 'auto',
+        block: 'end'
       });
       setAutoScroll(true);
       setIsAtBottom(true);
+      setShowScrollButton(false);
     }
   };
 
-  // Handle manual scroll by user
+  // Handle scroll event
   const handleScroll = () => {
+    debouncedCheckScroll();
+  };
+
+  // Effect to preserve scroll position when new content is added in the middle
+  useEffect(() => {
     if (!containerRef.current) return;
     
-    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-    const atBottom = scrollHeight - scrollTop - clientHeight < 200;
+    const container = containerRef.current;
+    const prevScrollHeight = prevScrollHeightRef.current;
+    const newScrollHeight = container.scrollHeight;
     
-    setIsAtBottom(atBottom);
-    setShowScrollButton(!atBottom);
-    
-    // If user manually scrolls up, disable auto-scroll
-    if (!atBottom && autoScroll) {
-      setAutoScroll(false);
+    // If user was not at bottom and content height changed, maintain relative scroll position
+    if (!isAtBottom && prevScrollHeight > 0 && newScrollHeight > prevScrollHeight) {
+      container.scrollTop += (newScrollHeight - prevScrollHeight);
     }
     
-    // If user manually scrolls to bottom, enable auto-scroll
-    if (atBottom && !autoScroll) {
-      setAutoScroll(true);
-    }
-  };
+    // Store current scroll height for next comparison
+    prevScrollHeightRef.current = newScrollHeight;
+  }, [messages]);
 
-  // Effect to handle scrolling when messages change
+  // Effect to scroll to bottom when messages change and we're in auto-scroll mode
   useEffect(() => {
-    if (autoScroll || isLoading) {
-      setTimeout(() => {
+    // Only auto-scroll in certain conditions:
+    // 1. Auto-scroll is enabled
+    // 2. New messages have been added (not just content changing)
+    // 3. Loading state has changed
+    const messagesChanged = messages.length !== prevMessagesLengthRef.current;
+    
+    if ((autoScroll && messagesChanged) || isLoading !== undefined) {
+      // Use RAF for smoother scrolling that doesn't conflict with React rendering
+      requestAnimationFrame(() => {
         scrollToBottom(false);
-      }, 10);
+      });
     }
     
-    checkScrollPosition();
-  }, [messages, isLoading]);
+    prevMessagesLengthRef.current = messages.length;
+  }, [messages, isLoading, autoScroll]);
 
   // Add scroll event listener
   useEffect(() => {
     const container = containerRef.current;
     if (container) {
-      container.addEventListener('scroll', handleScroll);
+      container.addEventListener('scroll', handleScroll, { passive: true });
       return () => container.removeEventListener('scroll', handleScroll);
     }
   }, []);
 
-  // Add custom styles for the scroll button animation
+  // Clean up scroll timeout on unmount
   useEffect(() => {
-    if (!document.getElementById('chat-scroll-button-style')) {
-      const style = document.createElement('style');
-      style.id = 'chat-scroll-button-style';
-      style.textContent = `
-        @keyframes bounce-subtle {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(3px); }
-        }
-        
-        .scroll-button-bounce {
-          animation: bounce-subtle 2s infinite ease-in-out;
-        }
-        
-        .suggestion-card {
-          transition: all 0.3s ease;
-          border: 1px solid transparent;
-        }
-        
-        .suggestion-card:hover {
-          transform: translateY(-2px) scale(1.02);
-        }
-        
-        .dark .suggestion-card:hover {
-          border-color: rgba(59, 130, 246, 0.3);
-        }
-        
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .suggestion-animate-in {
-          animation: fadeIn 0.5s ease forwards;
-        }
-      `;
-      document.head.appendChild(style);
-    }
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Scroll to bottom on initial render
+  useEffect(() => {
+    scrollToBottom(false);
+    // Check position after images might have loaded
+    const checkPositionAfterContentLoads = () => {
+      checkScrollPosition();
+      // Sometimes images and other content can load after our initial scroll,
+      // so we check again after a delay
+      setTimeout(checkScrollPosition, 1000);
+    };
+    
+    checkPositionAfterContentLoads();
+    
+    // Also check position when window resizes
+    window.addEventListener('resize', checkPositionAfterContentLoads);
+    return () => window.removeEventListener('resize', checkPositionAfterContentLoads);
   }, []);
 
   return (
@@ -149,12 +159,13 @@ export function ChatArea({
       <div 
         ref={containerRef}
         className={`flex-1 overflow-y-auto ${isDarkMode ? 'bg-[#0f0f15]' : 'bg-gray-50'} scrollbar-thin`}
+        style={{ willChange: 'transform', transform: 'translateZ(0)' }}
       >
         <div className="w-full min-h-full">
           {error && (
             <div className="m-4 p-4 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-xs sm:text-sm flex items-center">
-              <svg className="w-4 h-4 mr-2 flex-shrink-0\" fill="none\" stroke="currentColor\" viewBox="0 0 24 24\" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round\" strokeLinejoin="round\" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span className="flex-1">{error}</span>
               <button 
@@ -228,6 +239,7 @@ export function ChatArea({
                   } 
                 />
               ))}
+              <div ref={messagesEndRef} className="h-px" aria-hidden="true" />
             </div>
           )}
         </div>
@@ -236,7 +248,7 @@ export function ChatArea({
       {/* Scroll to bottom button */}
       {showScrollButton && (
         <button 
-          onClick={() => scrollToBottom()}
+          onClick={() => scrollToBottom(true)}
           className={`absolute bottom-24 right-4 p-2 rounded-full shadow-lg z-10 
             scroll-button-bounce ${
             isDarkMode 
@@ -248,6 +260,58 @@ export function ChatArea({
           <ArrowDownIcon className="w-5 h-5" />
         </button>
       )}
+      
+      {/* Custom styles for animations */}
+      <style jsx="true">{`
+        @keyframes bounce-subtle {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(3px); }
+        }
+        
+        .scroll-button-bounce {
+          animation: bounce-subtle 2s infinite ease-in-out;
+        }
+        
+        .suggestion-card {
+          transition: all 0.3s ease;
+          border: 1px solid transparent;
+        }
+        
+        .suggestion-card:hover {
+          transform: translateY(-2px) scale(1.02);
+        }
+        
+        .dark .suggestion-card:hover {
+          border-color: rgba(59, 130, 246, 0.3);
+        }
+        
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .suggestion-animate-in {
+          animation: fadeIn 0.5s ease forwards;
+        }
+        
+        /* Optimized scrolling */
+        .scrollbar-thin::-webkit-scrollbar {
+          width: 6px;
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+          background-color: rgba(156, 163, 175, 0.3);
+          border-radius: 3px;
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        
+        .dark .scrollbar-thin::-webkit-scrollbar-thumb {
+          background-color: rgba(75, 85, 99, 0.3);
+        }
+      `}</style>
     </div>
   );
 }

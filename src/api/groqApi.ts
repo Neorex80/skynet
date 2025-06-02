@@ -76,7 +76,7 @@ export const sendMessageToGroq = async (
   }
 };
 
-// Improved streaming API with better buffering for smoother text rendering
+// Optimized streaming implementation with better buffer handling
 export const streamMessageFromGroq = async (
   messages: Message[],
   onChunk: (chunk: string, type: 'content' | 'reasoning') => void,
@@ -124,7 +124,7 @@ export const streamMessageFromGroq = async (
       throw new Error(`Groq API error: ${response.status} - ${errorText}`);
     }
 
-    // Process the stream
+    // Process the stream with improved buffering for rendering performance
     const reader = response.body?.getReader();
     if (!reader) throw new Error('Response body is null');
 
@@ -134,78 +134,106 @@ export const streamMessageFromGroq = async (
     let reasoningBuffer = '';
     let lastUpdateTime = Date.now();
     
-    // Buffer settings for smoother UI updates
-    const MAX_BUFFER_SIZE = 100;  // Characters
-    const MIN_UPDATE_INTERVAL = 50; // Milliseconds (ms)
+    // Adaptive buffer settings for smoother UI updates
+    // These values adapt based on chunk size and time since last update
+    const MIN_BUFFER_SIZE = 10;  // Characters
+    const MAX_BUFFER_SIZE = 100; // Characters
+    const MIN_UPDATE_INTERVAL = 30; // Milliseconds
+    const MAX_UPDATE_INTERVAL = 100; // Milliseconds
+    
+    // Number of tokens processed since last UI update
+    let tokensProcessed = 0;
 
     const processStream = async () => {
-      const { done, value } = await reader.read();
-      
-      if (done) {
-        // Flush any remaining buffers
-        if (contentBuffer) onChunk(contentBuffer, 'content');
-        if (reasoningBuffer) onChunk(reasoningBuffer, 'reasoning');
+      try {
+        const { done, value } = await reader.read();
         
-        onComplete();
-        return;
-      }
-      
-      // Decode the chunk
-      buffer += decoder.decode(value, { stream: true });
-      
-      // Split the buffer by lines and process each line
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-      
-      for (const line of lines) {
-        if (line.trim() === '') continue;
-        
-        // Remove the "data: " prefix
-        const data = line.replace(/^data: /, '');
-        
-        // Skip the [DONE] message
-        if (data === '[DONE]') continue;
-        
-        try {
-          const parsed = JSON.parse(data);
-          const content = parsed.choices[0]?.delta?.content || '';
-          const reasoning = parsed.choices[0]?.delta?.reasoning || '';
+        if (done) {
+          // Flush any remaining buffers
+          if (contentBuffer) onChunk(contentBuffer, 'content');
+          if (reasoningBuffer) onChunk(reasoningBuffer, 'reasoning');
           
-          if (content) {
-            contentBuffer += content;
-          }
-          
-          if (reasoning) {
-            reasoningBuffer += reasoning;
-          }
-          
-          // Check if we should flush buffers based on size or time
-          const now = Date.now();
-          const timeElapsed = now - lastUpdateTime;
-          
-          if (contentBuffer.length >= MAX_BUFFER_SIZE || 
-              reasoningBuffer.length >= MAX_BUFFER_SIZE ||
-              timeElapsed >= MIN_UPDATE_INTERVAL) {
-            
-            if (contentBuffer) {
-              onChunk(contentBuffer, 'content');
-              contentBuffer = '';
-            }
-            
-            if (reasoningBuffer) {
-              onChunk(reasoningBuffer, 'reasoning');
-              reasoningBuffer = '';
-            }
-            
-            lastUpdateTime = now;
-          }
-        } catch (error) {
-          console.error('Error parsing stream:', error, data);
+          onComplete();
+          return;
         }
+        
+        // Decode the chunk
+        buffer += decoder.decode(value, { stream: true });
+        
+        // Split the buffer by lines and process each line
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        
+        for (const line of lines) {
+          if (line.trim() === '') continue;
+          
+          // Remove the "data: " prefix
+          const data = line.replace(/^data: /, '');
+          
+          // Skip the [DONE] message
+          if (data === '[DONE]') continue;
+          
+          try {
+            const parsed = JSON.parse(data);
+            const content = parsed.choices[0]?.delta?.content || '';
+            const reasoning = parsed.choices[0]?.delta?.reasoning || '';
+            
+            if (content) {
+              contentBuffer += content;
+              tokensProcessed++;
+            }
+            
+            if (reasoning) {
+              reasoningBuffer += reasoning;
+              tokensProcessed++;
+            }
+            
+            // Determine if we should update the UI based on:
+            // 1. Buffer size relative to content complexity
+            // 2. Time elapsed since last update
+            // 3. Number of tokens processed
+            const now = Date.now();
+            const timeElapsed = now - lastUpdateTime;
+            
+            // Adaptive buffer size - decrease for complex content with HTML/code
+            const effectiveBufferSize = contentBuffer.includes('```') || 
+                                     contentBuffer.includes('<') || 
+                                     reasoningBuffer.includes('```') ? 
+                                     MIN_BUFFER_SIZE : MAX_BUFFER_SIZE;
+            
+            // Update UI when any condition is met
+            const shouldUpdate = contentBuffer.length >= effectiveBufferSize || 
+                               reasoningBuffer.length >= effectiveBufferSize ||
+                               timeElapsed >= MAX_UPDATE_INTERVAL ||
+                               (tokensProcessed >= 5 && timeElapsed >= MIN_UPDATE_INTERVAL);
+            
+            if (shouldUpdate) {
+              // Performance optimization: Use requestAnimationFrame to sync with browser rendering
+              if (contentBuffer) {
+                window.requestAnimationFrame(() => onChunk(contentBuffer, 'content'));
+                contentBuffer = '';
+              }
+              
+              if (reasoningBuffer) {
+                window.requestAnimationFrame(() => onChunk(reasoningBuffer, 'reasoning'));
+                reasoningBuffer = '';
+              }
+              
+              lastUpdateTime = now;
+              tokensProcessed = 0;
+            }
+          } catch (error) {
+            console.error('Error parsing stream:', error, data);
+          }
+        }
+        
+        // Continue processing
+        processStream();
+      } catch (error) {
+        console.error('Error reading stream:', error);
+        // Try to complete gracefully
+        onComplete();
       }
-      
-      // Continue processing
-      processStream();
     };
     
     processStream();

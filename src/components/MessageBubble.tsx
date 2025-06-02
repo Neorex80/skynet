@@ -57,7 +57,6 @@ const LANGUAGE_DISPLAY_NAMES: Record<string, string> = {
   plaintext: 'text',
   text: 'text',
   txt: 'text',
-  // Add more mappings as needed
 };
 
 interface MessageBubbleProps { 
@@ -75,7 +74,7 @@ export function MessageBubble({ message, isDarkMode, onRegenerate }: MessageBubb
   const [liked, setLiked] = useState<boolean | null>(null);
   const [copied, setCopied] = useState(false);
   const [reasoningVisible, setReasoningVisible] = useState(true);
-  const [isCodeBlockHovered, setIsCodeBlockHovered] = useState(false);
+  const [contentRendered, setContentRendered] = useState(false);
   
   // Set dark mode class on document root for CSS targeting
   useEffect(() => {
@@ -86,6 +85,16 @@ export function MessageBubble({ message, isDarkMode, onRegenerate }: MessageBubb
     }
   }, [isDarkMode]);
 
+  // Mark content as rendered after a small delay
+  useEffect(() => {
+    if (!isEmptyAssistant && !contentRendered) {
+      const timer = setTimeout(() => {
+        setContentRendered(true);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isEmptyAssistant, contentRendered]);
+
   // Helper function to add language labels and copy buttons to code blocks
   const enhanceCodeBlocks = (container: HTMLDivElement | null) => {
     if (!container) return;
@@ -94,10 +103,6 @@ export function MessageBubble({ message, isDarkMode, onRegenerate }: MessageBubb
     preElements?.forEach(pre => {
       // Make sure we don't add multiple labels/buttons
       if (pre.querySelector('.code-language-label')) return;
-
-      // Add hover event listeners
-      pre.addEventListener('mouseenter', () => setIsCodeBlockHovered(true));
-      pre.addEventListener('mouseleave', () => setIsCodeBlockHovered(false));
 
       const code = pre.querySelector('code');
       if (!code) return;
@@ -169,10 +174,15 @@ export function MessageBubble({ message, isDarkMode, onRegenerate }: MessageBubb
 
   // Add language labels and copy buttons to code blocks
   useEffect(() => {
-    enhanceCodeBlocks(contentRef.current);
-    enhanceCodeBlocks(reasoningRef.current);
-    
-    // Add CSS for new features if not already added
+    // Only process once the content is stable
+    if (contentRendered) {
+      enhanceCodeBlocks(contentRef.current);
+      enhanceCodeBlocks(reasoningRef.current);
+    }
+  }, [contentRendered, message.content, message.reasoning]);
+
+  // Add styling enhancements
+  useEffect(() => {
     if (!document.getElementById('message-bubble-enhanced-styles')) {
       const style = document.createElement('style');
       style.id = 'message-bubble-enhanced-styles';
@@ -198,7 +208,6 @@ export function MessageBubble({ message, isDarkMode, onRegenerate }: MessageBubb
           font-family: monospace;
           font-size: 0.8rem;
           user-select: none;
-          counter-reset: line;
         }
         
         .dark .line-numbers {
@@ -250,12 +259,26 @@ export function MessageBubble({ message, isDarkMode, onRegenerate }: MessageBubb
           color: rgb(16, 185, 129) !important;
         }
         
+        /* Rendering optimizations */
+        .streaming-content {
+          will-change: contents;
+          transform: translateZ(0);
+          contain: content;
+          word-break: break-word;
+        }
+        
+        .message-content {
+          backface-visibility: hidden;
+        }
+        
         /* Improved reasoning section */
         .reasoning-section {
           border-radius: 0.5rem;
           overflow: hidden;
           transition: all 0.3s ease;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          will-change: contents;
+          transform: translateZ(0);
         }
         
         .reasoning-header {
@@ -333,7 +356,7 @@ export function MessageBubble({ message, isDarkMode, onRegenerate }: MessageBubb
       `;
       document.head.appendChild(style);
     }
-  }, [message.content, message.reasoning]);
+  }, []);
 
   const handleCopyFullResponse = () => {
     navigator.clipboard.writeText(message.content);
@@ -417,7 +440,7 @@ export function MessageBubble({ message, isDarkMode, onRegenerate }: MessageBubb
                 </div>
               ) : (
                 <div className="text-left">
-                  {/* Reasoning Section (if available) - Enhanced with better styling */}
+                  {/* Reasoning Section (if available) */}
                   {message.reasoning && (
                     <div className={`mb-4 reasoning-section ${
                       isDarkMode ? 'bg-[#1a1a24] border border-[#222233]' : 'bg-gray-50 border border-gray-200'
@@ -465,21 +488,21 @@ export function MessageBubble({ message, isDarkMode, onRegenerate }: MessageBubb
                           remarkPlugins={[remarkGfm]}
                           rehypePlugins={[[rehypePrism, { ignoreMissing: true }]]}
                         >
-                          {message.reasoning}
+                          {message.reasoning || ''}
                         </ReactMarkdown>
                       </div>
                     </div>
                   )}
 
-                  {/* Main Content - Enhanced with better styling */}
+                  {/* Main Content */}
                   <div 
                     ref={contentRef} 
-                    className={`streaming-content p-4 rounded-2xl rounded-tl-sm shadow-sm ${
+                    className={`message-content p-4 rounded-2xl rounded-tl-sm shadow-sm ${
                       isDarkMode ? 'bg-[#1a1a24] border border-[#222233]' : 'bg-white border border-gray-200'
                     }`}
                   >
                     <ReactMarkdown 
-                      className={`prose ${isDarkMode ? 'prose-invert dark' : 'prose-gray'} prose-sm md:prose-base max-w-none break-words`}
+                      className={`prose ${isDarkMode ? 'prose-invert dark' : 'prose-gray'} prose-sm md:prose-base max-w-none break-words streaming-content`}
                       remarkPlugins={[remarkGfm]}
                       rehypePlugins={[[rehypePrism, { ignoreMissing: true }]]}
                     >
@@ -489,7 +512,7 @@ export function MessageBubble({ message, isDarkMode, onRegenerate }: MessageBubb
                 </div>
               )}
               
-              {/* Assistant message actions - always visible now with improved styling */}
+              {/* Assistant message actions */}
               {!isEmptyAssistant && (
                 <div className="message-controls">
                   {/* Copy button */}
