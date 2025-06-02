@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Message } from '../types';
 import { MessageBubble } from './MessageBubble';
 import { ArrowDownIcon } from '@heroicons/react/24/outline';
