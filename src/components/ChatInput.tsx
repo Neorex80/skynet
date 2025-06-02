@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { PaperAirplaneIcon as Send } from '@heroicons/react/24/solid';
-import { StopCircle } from 'lucide-react';
+import { StopCircle, Sparkles, Image, Paperclip, Mic } from 'lucide-react';
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -21,6 +21,7 @@ export function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [showPlaceholder, setShowPlaceholder] = useState(true);
 
   const handleSend = () => {
     if (!input.trim() || disabled) return;
@@ -52,6 +53,7 @@ export function ChatInput({
 
   useEffect(() => {
     adjustTextareaHeight();
+    setShowPlaceholder(!input);
   }, [input]);
 
   // Adjust textarea height on window resize
@@ -71,6 +73,47 @@ export function ChatInput({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+  
+  // CSS for blinking cursor placeholder
+  useEffect(() => {
+    if (!document.getElementById('chat-input-cursor-style')) {
+      const style = document.createElement('style');
+      style.id = 'chat-input-cursor-style';
+      style.textContent = `
+        @keyframes blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0; }
+        }
+        .cursor-placeholder::after {
+          content: '|';
+          margin-left: 2px;
+          animation: blink 1s infinite;
+        }
+        
+        @keyframes gradient-shift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        
+        .input-focus-ring {
+          background: linear-gradient(90deg, 
+            rgba(59, 130, 246, 0.5) 0%, 
+            rgba(139, 92, 246, 0.5) 50%, 
+            rgba(59, 130, 246, 0.5) 100%);
+          background-size: 200% 100%;
+          animation: gradient-shift 3s ease infinite;
+          opacity: 0;
+          transition: opacity 0.3s ease;
+        }
+        
+        .input-focus-ring.visible {
+          opacity: 1;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  }, []);
 
   return (
     <div 
@@ -78,56 +121,83 @@ export function ChatInput({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <textarea
-        ref={textareaRef}
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        placeholder="What's on your mind? 💭"
-        disabled={disabled}
-        className={`w-full resize-none rounded-xl py-3 pl-3 sm:pl-4 pr-10 sm:pr-14 text-sm md:text-base shadow-md transition-all duration-200 ${
-          isDarkMode
-            ? 'bg-gray-800/80 text-gray-100 placeholder-gray-400 border-gray-700/50 hover:bg-gray-800 focus:bg-gray-800'
-            : 'bg-white/90 text-gray-800 placeholder-gray-500 border-gray-200/50 hover:bg-white focus:bg-white'
-        } disabled:opacity-60 disabled:cursor-not-allowed border focus:outline-none focus:ring-2 focus:ring-blue-500/50`}
-        style={{ 
-          minHeight: '44px',
-          maxHeight: window.innerWidth < 640 ? '120px' : '160px',
-          height: 'auto',
-          scrollbarWidth: 'thin',
-        }}
-      />
+      {/* Enhanced interactive placeholder */}
+      {showPlaceholder && !isFocused && (
+        <div className={`absolute left-4 top-1/2 -translate-y-1/2 flex items-center pointer-events-none ${
+          isDarkMode ? 'text-gray-500' : 'text-gray-500'
+        }`}>
+          <span className="text-sm mr-1">What's on your mind?</span>
+          {!isGenerating && <span className={`text-sm cursor-placeholder`}></span>}
+        </div>
+      )}
+      
+      {/* Focus ring effect (visible when focused or hovered) */}
+      <div className={`absolute -inset-0.5 rounded-xl blur-md z-0 input-focus-ring ${
+        (isFocused || isHovered) ? 'visible' : ''
+      }`}></div>
+      
+      <div className={`relative z-10 flex items-center bg-transparent`}>
+        <textarea
+          ref={textareaRef}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          placeholder=""
+          disabled={disabled}
+          className={`w-full resize-none rounded-xl py-3 pl-3 sm:pl-4 pr-14 sm:pr-24 text-sm md:text-base shadow-md transition-all duration-200 ${
+            isDarkMode
+              ? 'bg-gray-800/95 text-gray-100 border-gray-700/50 focus:bg-gray-800'
+              : 'bg-white/95 text-gray-800 border-gray-200/50 focus:bg-white'
+          } disabled:opacity-60 disabled:cursor-not-allowed border focus:outline-none`}
+          style={{ 
+            minHeight: '44px',
+            maxHeight: window.innerWidth < 640 ? '120px' : '160px',
+            height: 'auto',
+            scrollbarWidth: 'thin',
+          }}
+        />
 
-      {/* Button */}
-      <button
-        onClick={isGenerating ? onStop : handleSend}
-        disabled={isGenerating ? false : (disabled || !input.trim())}
-        className={`absolute right-2 sm:right-2.5 top-1/2 -translate-y-1/2 p-1.5 sm:p-2 rounded-lg transition-all duration-200 group-hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${
-          isDarkMode
-            ? 'bg-blue-600 hover:bg-blue-700 text-white'
-            : 'bg-blue-500 hover:bg-blue-600 text-white'
-        } ${isGenerating ? 'animate-pulse' : ''}`}
-        aria-label={isGenerating ? "Stop generating" : "Send message"}
-      >
-        {isGenerating ? (
-          <StopCircle className="w-4 h-4 sm:w-5 sm:h-5" />
-        ) : (
-          <Send className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-200 ${
-            isHovered && !disabled && input.trim() ? 'rotate-45' : ''
-          }`} />
-        )}
-      </button>
-
-      {/* Subtle glow effect */}
-      <div 
-        className={`absolute inset-0 -z-10 rounded-xl transition-opacity duration-300 ${
-          isFocused || isHovered
-            ? 'opacity-100 bg-blue-500/10 blur-xl'
-            : 'opacity-0'
-        }`}
-      />
+        {/* Enhanced button area with potential for additional buttons */}
+        <div className="absolute right-2 sm:right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 sm:gap-2">
+          {/* Optional feature buttons - can be enabled later */}
+          {isGenerating ? (
+            <button
+              onClick={onStop}
+              className={`p-1.5 rounded-lg transition-all duration-200 ${
+                isDarkMode
+                  ? 'bg-red-600/90 hover:bg-red-700 text-white'
+                  : 'bg-red-600/90 hover:bg-red-700 text-white'
+              }`}
+              aria-label="Stop generating"
+              title="Stop generating"
+            >
+              <StopCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+          ) : (
+            /* Main send button */
+            <button
+              onClick={handleSend}
+              disabled={isGenerating ? false : !input.trim()}
+              className={`p-1.5 sm:p-2 rounded-lg transition-all duration-200 ${
+                !input.trim()
+                  ? isDarkMode
+                    ? 'bg-gray-700/90 text-gray-500 cursor-not-allowed' 
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : isDarkMode
+                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+              } ${isHovered && input.trim() ? 'scale-105' : ''}`}
+              aria-label="Send message"
+            >
+              <Send className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-200 ${
+                isHovered && input.trim() ? 'rotate-45 translate-x-px -translate-y-px' : ''
+              }`} />
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
