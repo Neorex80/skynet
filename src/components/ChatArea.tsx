@@ -130,8 +130,8 @@ export function ChatArea({
         <div className="w-full min-h-full">
           {error && (
             <div className="m-4 p-4 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-xs sm:text-sm flex items-center">
-              <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg className="w-4 h-4 mr-2 flex-shrink-0\" fill="none\" stroke="currentColor\" viewBox="0 0 24 24\" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round\" strokeLinejoin="round\" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span className="flex-1">{error}</span>
               <button 
