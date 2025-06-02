@@ -31,19 +31,21 @@ export function ChatArea({
   const containerRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [isAtBottom, setIsAtBottom] = useState(true);
 
   // Check if we need to show the scroll to bottom button
   const checkScrollPosition = () => {
     if (!containerRef.current) return;
     
     const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-    // Show button when user scrolls up more than 300px from bottom
-    const isNearBottom = scrollHeight - scrollTop - clientHeight < 300;
+    // Show button when user scrolls up more than 200px from bottom
+    const atBottom = scrollHeight - scrollTop - clientHeight < 200;
     
-    setShowScrollButton(!isNearBottom);
+    setIsAtBottom(atBottom);
+    setShowScrollButton(!atBottom);
     
     // Auto-scroll only if we're already near the bottom or if it's explicitly enabled
-    if (isNearBottom || autoScroll) {
+    if (atBottom && autoScroll) {
       scrollToBottom(false);
     }
   };
@@ -56,20 +58,50 @@ export function ChatArea({
         behavior: forceSmooth ? 'smooth' : 'auto'
       });
       setAutoScroll(true);
+      setIsAtBottom(true);
+    }
+  };
+
+  // Handle manual scroll by user
+  const handleScroll = () => {
+    if (!containerRef.current) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+    const atBottom = scrollHeight - scrollTop - clientHeight < 200;
+    
+    setIsAtBottom(atBottom);
+    setShowScrollButton(!atBottom);
+    
+    // If user manually scrolls up, disable auto-scroll
+    if (!atBottom && autoScroll) {
+      setAutoScroll(false);
+    }
+    
+    // If user manually scrolls to bottom, enable auto-scroll
+    if (atBottom && !autoScroll) {
+      setAutoScroll(true);
     }
   };
 
   // Effect to handle scrolling when messages change
   useEffect(() => {
-    checkScrollPosition();
+    if (autoScroll || isLoading) {
+      setTimeout(() => {
+        scrollToBottom(false);
+      }, 10);
+    }
     
-    // Setup scroll event listener
+    checkScrollPosition();
+  }, [messages, isLoading]);
+
+  // Add scroll event listener
+  useEffect(() => {
     const container = containerRef.current;
     if (container) {
-      container.addEventListener('scroll', checkScrollPosition);
-      return () => container.removeEventListener('scroll', checkScrollPosition);
+      container.addEventListener('scroll', handleScroll);
+      return () => container.removeEventListener('scroll', handleScroll);
     }
-  }, [messages, isLoading]);
+  }, []);
 
   // Add custom styles for the scroll button animation
   useEffect(() => {
@@ -117,21 +149,12 @@ export function ChatArea({
       <div 
         ref={containerRef}
         className={`flex-1 overflow-y-auto ${isDarkMode ? 'bg-[#0f0f15]' : 'bg-gray-50'} scrollbar-thin`}
-        onScroll={() => {
-          if (containerRef.current) {
-            const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-            // If user manually scrolls up, disable auto-scroll
-            if (scrollHeight - scrollTop - clientHeight > 100) {
-              setAutoScroll(false);
-            }
-          }
-        }}
       >
         <div className="w-full min-h-full">
           {error && (
             <div className="m-4 p-4 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-xs sm:text-sm flex items-center">
-              <svg className="w-4 h-4 mr-2 flex-shrink-0\" fill="none\" stroke="currentColor\" viewBox="0 0 24 24\" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round\" strokeLinejoin="round\" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span className="flex-1">{error}</span>
               <button 
